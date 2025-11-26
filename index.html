@@ -272,7 +272,7 @@
     function updateOnlineUsers() {
       const users = getOnlineUsers();
       const now = Date.now();
-      const timeout = 30000; // 30 seconds timeout
+      const timeout = 10000; // 10 seconds timeout instead of 30
 
       // Remove inactive users
       Object.keys(users).forEach(id => {
@@ -295,9 +295,9 @@
       window.dispatchEvent(new Event('online-users-updated'));
     }
 
-    // Update on page load and every 5 seconds
+    // Update on page load and every 2 seconds
     updateOnlineUsers();
-    setInterval(updateOnlineUsers, 5000);
+    setInterval(updateOnlineUsers, 2000);
 
     // Listen for updates from other tabs
     window.addEventListener('storage', (e) => {
@@ -308,6 +308,15 @@
 
     // Clean up when closing the page
     window.addEventListener('beforeunload', () => {
+      const users = getOnlineUsers();
+      delete users[sessionId];
+      localStorage.setItem('onlineUsers', JSON.stringify(users));
+      // Also update all tabs immediately
+      window.dispatchEvent(new Event('online-users-updated'));
+    });
+
+    // Also handle tab/window close
+    window.addEventListener('unload', () => {
       const users = getOnlineUsers();
       delete users[sessionId];
       localStorage.setItem('onlineUsers', JSON.stringify(users));
