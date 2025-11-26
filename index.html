@@ -251,77 +251,65 @@
     </div>
   </footer>
 
-  <script>
-    // Real online counter using localStorage and sessionStorage
+  <script type="module">
+    // Import Firebase modules
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+    import { getDatabase, ref, set, onValue, push, remove, get } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
+
+    // Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyBdUECEKcfWZsI6VbWknyG_--qasAl6v6Y",
+      authDomain: "amco-store.firebaseapp.com",
+      projectId: "amco-store",
+      storageBucket: "amco-store.firebasestorage.app",
+      messagingSenderId: "909731536370",
+      appId: "1:909731536370:web:c80c24aa989f9002b7df6b"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const database = getDatabase(app);
+
+    // Generate unique session ID
+    const sessionId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     const onlineCountElement = document.getElementById('online-count');
-    
-    // Generate a unique session ID for this user
-    let sessionId = sessionStorage.getItem('sessionId');
-    if (!sessionId) {
-      sessionId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-      sessionStorage.setItem('sessionId', sessionId);
-    }
 
-    // Get current online users from localStorage
-    function getOnlineUsers() {
-      const stored = localStorage.getItem('onlineUsers');
-      return stored ? JSON.parse(stored) : {};
-    }
+    // Add current user to online list
+    const userRef = ref(database, 'online_users/' + sessionId);
+    set(userRef, { timestamp: new Date().getTime() });
 
-    // Update online users list
-    function updateOnlineUsers() {
-      const users = getOnlineUsers();
-      const now = Date.now();
-      const timeout = 10000; // 10 seconds timeout instead of 30
+    // Listen to online users count
+    const onlineRef = ref(database, 'online_users');
+    onValue(onlineRef, (snapshot) => {
+      const data = snapshot.val();
+      const count = data ? Object.keys(data).length : 0;
+      onlineCountElement.textContent = count;
+    });
 
-      // Remove inactive users
-      Object.keys(users).forEach(id => {
-        if (now - users[id] > timeout) {
-          delete users[id];
+    // Remove user when leaving
+    window.addEventListener('beforeunload', () => {
+      remove(userRef);
+    });
+
+    // Clean up inactive users (older than 5 minutes)
+    setInterval(() => {
+      get(onlineRef).then((snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.val();
+          const now = new Date().getTime();
+          const timeout = 5 * 60 * 1000; // 5 minutes
+          
+          Object.keys(data).forEach(id => {
+            if (now - data[id].timestamp > timeout) {
+              remove(ref(database, 'online_users/' + id));
+            }
+          });
         }
       });
+    }, 60000); // Check every minute
+  </script>
 
-      // Add current user
-      users[sessionId] = now;
-
-      // Save to localStorage
-      localStorage.setItem('onlineUsers', JSON.stringify(users));
-
-      // Update the counter
-      const count = Object.keys(users).length;
-      onlineCountElement.textContent = count;
-
-      // Notify other tabs/windows
-      window.dispatchEvent(new Event('online-users-updated'));
-    }
-
-    // Update on page load and every 2 seconds
-    updateOnlineUsers();
-    setInterval(updateOnlineUsers, 2000);
-
-    // Listen for updates from other tabs
-    window.addEventListener('storage', (e) => {
-      if (e.key === 'onlineUsers') {
-        updateOnlineUsers();
-      }
-    });
-
-    // Clean up when closing the page
-    window.addEventListener('beforeunload', () => {
-      const users = getOnlineUsers();
-      delete users[sessionId];
-      localStorage.setItem('onlineUsers', JSON.stringify(users));
-      // Also update all tabs immediately
-      window.dispatchEvent(new Event('online-users-updated'));
-    });
-
-    // Also handle tab/window close
-    window.addEventListener('unload', () => {
-      const users = getOnlineUsers();
-      delete users[sessionId];
-      localStorage.setItem('onlineUsers', JSON.stringify(users));
-    });
-
+  <script>
     // Accessible size selection and localized French messages
     document.querySelectorAll('.card').forEach(card => {
       const sizeButtons = card.querySelectorAll('.size-btn');
